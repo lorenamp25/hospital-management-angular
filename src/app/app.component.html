@@ -1,0 +1,457 @@
+<!-- AUTH -->
+<div class="authWrap" *ngIf="!user()">
+  <div class="authCard">
+    <div class="authHeader">
+      <div class="logo">Hpl</div>
+      <div>
+        <div class="title">HospitalPro</div>
+        <div class="sub">App realista: roles · agenda · pacientes · doctores · export</div>
+      </div>
+      <button class="chip" (click)="toggleTheme()">{{ theme()==='dark' ? '🌙' : '☀️' }}</button>
+    </div>
+
+    <div class="authGrid">
+      <div class="panel">
+        <h2>Login</h2>
+        <p class="muted small">
+          Demo admin: admin&#64;demo.com / Admin123!
+        </p>
+
+        <label>Email</label>
+        <input [(ngModel)]="loginEmail" placeholder="admin@demo.com" />
+
+        <label>Contraseña</label>
+        <input type="password" [(ngModel)]="loginPass" placeholder="Admin123!" />
+
+        <label class="check">
+          <input type="checkbox" [(ngModel)]="remember" />
+          Recordarme
+        </label>
+
+        <div class="rowBtns">
+          <button class="btn primary2" (click)="login()">Entrar</button>
+          <button class="btn ghost" (click)="resetDemo()">Reset demo</button>
+        </div>
+
+        <p class="muted tiny">
+          Nota: esto es demo portfolio (LocalStorage), para producción sería backend + tokens.<br>
+          <br>
+          Para probar la app ponte en modo admin (ver credenciales arriba) y luego puedes crear usuarios con otros roles para testear permisos.
+        </p>
+      </div>
+
+      <div class="panel">
+        <h2>Registro</h2>
+        <p class="muted small">Contraseña fuerte: 8+ mayus/minus/número/símbolo.</p>
+
+        <label>Nombre</label>
+        <input [(ngModel)]="regName" placeholder="Tu nombre" />
+
+        <label>Email</label>
+        <input [(ngModel)]="regEmail" placeholder="tu@email.com" />
+
+        <label>Contraseña</label>
+        <input type="password" [(ngModel)]="regPass" placeholder="Abc123!@" />
+
+        <label class="nombres3">Rol</label>
+        <select [(ngModel)]="regRole" class="nombres3">
+          <option value="recepcion" class="nombres3">Recepción</option>
+          <option value="doctor" class="nombres3">Doctor</option>
+          <option value="admin" class="nombres3">Admin</option>
+        </select>
+
+        <button class="btn primary" (click)="register()">Crear cuenta</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" *ngIf="toastMsg() as m">{{ m }}</div>
+</div>
+
+<!-- APP -->
+<div class="app" *ngIf="user() as u">
+  <aside class="side">
+    <div class="brand">
+      <div class="logo">H</div>
+      <div>
+        <div class="title">HospitalPro</div>
+        <div class="sub">{{ u.name }} · {{ u.role }}</div>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <button class="navBtn" [class.active]="view()==='dashboard'" (click)="view.set('dashboard')">📊 Dashboard</button>
+      <button class="navBtn" [class.active]="view()==='calendar'" (click)="view.set('calendar')">🗓️ Agenda</button>
+      <button class="navBtn" [class.active]="view()==='appointments'" (click)="view.set('appointments')">📅 Citas</button>
+      <button class="navBtn" [class.active]="view()==='patients'" (click)="view.set('patients')">👤 Pacientes</button>
+      <button class="navBtn" [class.active]="view()==='doctors'" (click)="view.set('doctors')">🩺 Doctores</button>
+    </nav>
+
+    <div class="sideActions">
+      <button class="chip" (click)="toggleTheme()">{{ theme()==='dark' ? '🌙 Oscuro' : '☀️ Claro' }}</button>
+      <button class="chip" (click)="setToday()">📍 Hoy</button>
+      <button class="chip" (click)="clearFilters()">🧹 Limpiar filtros</button>
+
+      <button class="chip" (click)="exportJSON()">⬇️ Export JSON</button>
+
+      <label class="chip file" [class.disabled]="u.role!=='admin'">
+        ⬆️ Import JSON (admin)
+        <input type="file" accept="application/json" (change)="importJSON($event)" [disabled]="u.role!=='admin'" />
+      </label>
+
+      <button class="chip" (click)="exportCSV()">📄 Export CSV</button>
+      <button class="chip" (click)="exportPDF()">🖨️ Export PDF</button>
+
+      <button class="chip danger" (click)="logout()">Cerrar sesión</button>
+    </div>
+
+    <div class="hint">
+      Drag&drop en agenda: arrastra una cita a otra hora.
+    </div>
+  </aside>
+
+  <main class="main">
+    <!-- TOP -->
+    <header class="top">
+      <div>
+        <h1>{{ view() }}</h1>
+        <div class="muted">Búsqueda global y filtros inteligentes</div>
+      </div>
+
+      <div class="filters">
+        <input [ngModel]="q()" (ngModelChange)="q.set($event)" placeholder="Buscar (paciente, doctor, motivo...)" />
+        <select [ngModel]="doctorFilter()" (ngModelChange)="doctorFilter.set($event)">
+          <option value="">Todos los doctores</option>
+          <option *ngFor="let d of doctors()" [value]="d.id">{{ d.name }} · {{ d.specialty }}</option>
+        </select>
+        <select [ngModel]="statusFilter()" (ngModelChange)="statusFilter.set($event)">
+          <option value="todas">Todos los estados</option>
+          <option *ngFor="let s of statuses" [value]="s">{{ s }}</option>
+        </select>
+        <label class="check">
+          <input type="checkbox" [ngModel]="onlyToday()" (ngModelChange)="onlyToday.set($event)" />
+          Solo hoy
+        </label>
+      </div>
+    </header>
+
+    <!-- KPIs -->
+    <section class="kpis">
+      <div class="kpi"><div class="k">Hoy</div><div class="v">{{ kpis().todayCount }}</div></div>
+      <div class="kpi"><div class="k">Total</div><div class="v">{{ kpis().total }}</div></div>
+      <div class="kpi"><div class="k">Programadas</div><div class="v">{{ kpis().prog }}</div></div>
+      <div class="kpi"><div class="k">En curso</div><div class="v">{{ kpis().enc }}</div></div>
+      <div class="kpi"><div class="k">Finalizadas</div><div class="v">{{ kpis().fin }}</div></div>
+      <div class="kpi"><div class="k">Canceladas</div><div class="v">{{ kpis().can }}</div></div>
+    </section>
+
+    <!-- DASHBOARD -->
+    <section class="card" *ngIf="view()==='dashboard'">
+      <div class="cardHead">
+        <h2>Próximas citas</h2>
+        <span class="muted small">Click para detalle</span>
+      </div>
+
+      <div class="list" *ngIf="nextAppointments().length; else emptyDash">
+        <div class="item" *ngFor="let a of nextAppointments()" (click)="openAppt(a)">
+          <div class="line1">
+            <b>{{ patientName()(a.patientId) }}</b>
+            <span class="badge" [attr.data-s]="a.status">{{ a.status }}</span>
+            <span class="muted">{{ a.dateTime.replace('T',' ') }}</span>
+          </div>
+          <div class="muted">🩺 {{ doctorName()(a.doctorId) }} · {{ a.reason || '—' }}</div>
+        </div>
+      </div>
+
+      <ng-template #emptyDash>
+        <p class="muted">No hay próximas citas.</p>
+      </ng-template>
+    </section>
+
+    <!-- CALENDAR -->
+    <section class="card" *ngIf="view()==='calendar'">
+      <div class="cardHead">
+        <h2>Agenda semanal</h2>
+        <div class="right">
+          <span class="muted small">{{ weekLabel() }}</span>
+          <button class="btn ghost" (click)="prevWeek()">←</button>
+          <button class="btn ghost" (click)="thisWeek()">Hoy</button>
+          <button class="btn ghost" (click)="nextWeek()">→</button>
+        </div>
+      </div>
+
+      <div class="calendar">
+        <div class="calHead">
+          <div class="cell time">Hora</div>
+          <div class="cell" *ngFor="let d of weekDays()">{{ fmtDay(d) }}</div>
+        </div>
+
+        <div class="calRow" *ngFor="let h of hours">
+          <div class="cell time"><b>{{ (h<10?'0':'') + h }}:00</b></div>
+
+          <div class="cell slot"
+               *ngFor="let d of weekDays()"
+               (dragover)="allowDrop($event)"
+               (drop)="dropTo(d.toISOString().slice(0,10), h)">
+
+            <ng-container *ngIf="apptsAt(d.toISOString().slice(0,10), h) as ap">
+              <div class="slotEmpty muted small" *ngIf="ap.length===0">—</div>
+
+              <div class="slotCard"
+                   *ngFor="let a of ap"
+                   draggable="true"
+                   (dragstart)="dragStart(a.id)"
+                   (click)="openAppt(a)">
+                <div class="line1">
+                  <span class="badge mini" [attr.data-s]="a.status">{{ a.status }}</span>
+                  <b class="cut">{{ patientName()(a.patientId) }}</b>
+                </div>
+                <div class="muted small cut">🩺 {{ doctorName()(a.doctorId) }}</div>
+              </div>
+            </ng-container>
+          </div>
+        </div>
+      </div>
+
+      <p class="muted small" style="margin-top:10px">
+        Drag&drop: arrastra una cita a otra hora (valida colisiones).
+      </p>
+    </section>
+
+    <!-- APPOINTMENTS -->
+    <section class="card" *ngIf="view()==='appointments'">
+      <div class="cardHead">
+        <h2>Nueva cita</h2>
+        <span class="muted small" *ngIf="!canEditAppointments()">Solo lectura (tu rol)</span>
+      </div>
+
+      <div class="gridForm" [class.disabled]="!canEditAppointments()">
+        <label>Paciente
+          <select [(ngModel)]="aPatientId" [disabled]="!canEditAppointments()">
+            <option value="" disabled>Selecciona...</option>
+            <option *ngFor="let p of patients()" [value]="p.id">{{ p.name }}</option>
+          </select>
+        </label>
+
+        <label>Doctor
+          <select [(ngModel)]="aDoctorId" [disabled]="!canEditAppointments()">
+            <option value="" disabled>Selecciona...</option>
+            <option *ngFor="let d of doctors()" [value]="d.id">{{ d.name }} · {{ d.specialty }}</option>
+          </select>
+        </label>
+
+        <label>Fecha/hora
+          <input type="datetime-local" [(ngModel)]="aDateTime" [disabled]="!canEditAppointments()" />
+        </label>
+
+        <label>Estado
+          <select [(ngModel)]="aStatus" [disabled]="!canEditAppointments()">
+            <option *ngFor="let s of statuses" [value]="s">{{ s }}</option>
+          </select>
+        </label>
+
+        <label class="span2">Motivo
+          <input [(ngModel)]="aReason" [disabled]="!canEditAppointments()" placeholder="Ej: revisión, analítica..." />
+        </label>
+      </div>
+
+      <button class="btn primary" (click)="addAppointment()" [disabled]="!canEditAppointments()">Guardar cita</button>
+
+      <div class="cardHead" style="margin-top:14px">
+        <h2>Listado</h2>
+        <span class="muted small">{{ visibleAppointments().length }} resultados</span>
+      </div>
+
+      <div class="list" *ngIf="visibleAppointments().length; else emptyA">
+        <div class="item" *ngFor="let a of visibleAppointments()" (click)="openAppt(a)">
+          <div class="line1">
+            <b>{{ patientName()(a.patientId) }}</b>
+            <span class="badge" [attr.data-s]="a.status">{{ a.status }}</span>
+            <span class="muted">{{ a.dateTime.replace('T',' ') }}</span>
+          </div>
+          <div class="muted">🩺 {{ doctorName()(a.doctorId) }} · {{ a.reason || '—' }}</div>
+        </div>
+      </div>
+
+      <ng-template #emptyA><p class="muted">No hay citas.</p></ng-template>
+    </section>
+
+    <!-- PATIENTS -->
+    <section class="card" *ngIf="view()==='patients'">
+      <div class="cardHead">
+        <h2>Nuevo paciente</h2>
+        <span class="muted small" *ngIf="!canEditPatients()">Solo lectura (tu rol)</span>
+      </div>
+
+      <div class="gridForm" [class.disabled]="!canEditPatients()">
+        <label>Nombre
+          <input [(ngModel)]="pName" [disabled]="!canEditPatients()" />
+        </label>
+        <label>Fecha nacimiento
+          <input type="date" [(ngModel)]="pDob" [disabled]="!canEditPatients()" />
+        </label>
+        <label>Teléfono
+          <input [(ngModel)]="pPhone" [disabled]="!canEditPatients()" />
+        </label>
+        <label>Email
+          <input [(ngModel)]="pEmail" [disabled]="!canEditPatients()" placeholder="paciente@email.com" />
+        </label>
+        <label class="span2">Foto (URL)
+          <input [(ngModel)]="pPhotoUrl" [disabled]="!canEditPatients()" placeholder="https://..." />
+        </label>
+        <label>Alérgenos
+          <input [(ngModel)]="pAllergies" [disabled]="!canEditPatients()" />
+        </label>
+        <label class="span2">Notas
+          <input [(ngModel)]="pNotes" [disabled]="!canEditPatients()" />
+        </label>
+      </div>
+
+      <button class="btn primary" (click)="addPatient()" [disabled]="!canEditPatients()">Guardar paciente</button>
+
+      <div class="cardHead" style="margin-top:14px">
+        <h2>Listado</h2>
+        <span class="muted small">{{ visiblePatients().length }} resultados</span>
+      </div>
+
+      <div class="list" *ngIf="visiblePatients().length; else emptyP">
+        <div class="item" *ngFor="let p of visiblePatients()" (click)="openPatient(p)">
+          <div class="line1">
+            <b>{{ p.name }}</b>
+            <span class="muted">{{ p.dob }}</span>
+            <span class="muted" *ngIf="p.phone">📞 {{ p.phone }}</span>
+          </div>
+          <div class="muted small cut">{{ p.notes || '—' }}</div>
+        </div>
+      </div>
+
+      <ng-template #emptyP><p class="muted">No hay pacientes.</p></ng-template>
+    </section>
+
+    <!-- DOCTORS -->
+    <section class="card" *ngIf="view()==='doctors'">
+      <div class="cardHead">
+        <h2>Doctores</h2>
+        <span class="muted small" *ngIf="!canManageDoctors()">Solo admin puede crear/eliminar</span>
+      </div>
+
+      <div class="gridForm" [class.disabled]="!canManageDoctors()">
+        <label>Nombre
+          <input [(ngModel)]="newDoctorName" [disabled]="!canManageDoctors()" placeholder="Dra. ..." />
+        </label>
+        <label>Especialidad
+          <input [(ngModel)]="newDoctorSpec" [disabled]="!canManageDoctors()" placeholder="Cardiología..." />
+        </label>
+      </div>
+
+      <button class="btn primary" (click)="addDoctor()" [disabled]="!canManageDoctors()">Añadir doctor</button>
+
+      <div class="list" style="margin-top:14px">
+        <div class="item" *ngFor="let d of doctors()">
+          <div class="line1">
+            <b>{{ d.name }}</b>
+            <span class="muted">· {{ d.specialty }}</span>
+          </div>
+          <div class="right">
+            <button class="btn ghost" (click)="removeDoctor(d.id)" [disabled]="!canManageDoctors()">Eliminar</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="foot muted">
+      ✅ Portfolio: roles · calendar drag&drop · colisiones · historial · export CSV/PDF · UI pro
+    </footer>
+  </main>
+
+  <div class="toast" *ngIf="toastMsg() as m">{{ m }}</div>
+
+  <!-- PATIENT MODAL -->
+  <div class="modal" *ngIf="patientModal() as p" (click)="closePatient()">
+    <div class="modalCard" (click)="$event.stopPropagation()">
+      <div class="modalHead">
+        <div class="avatar" [style.background-image]="p.photoUrl ? 'url('+p.photoUrl+')' : ''">
+          <span *ngIf="!p.photoUrl">{{ p.name.slice(0,1).toUpperCase() }}</span>
+        </div>
+        <div class="grow">
+          <h3>{{ p.name }}</h3>
+          <div class="muted small">{{ p.dob }} · {{ p.phone || 'sin teléfono' }} · {{ p.email || 'sin email' }}</div>
+          <div class="muted small">Alergias: {{ p.allergies || '—' }}</div>
+        </div>
+        <button class="btn ghost" (click)="closePatient()">Cerrar</button>
+      </div>
+
+      <div class="modalGrid">
+        <div class="box">
+          <div class="muted small">Notas</div>
+          <div>{{ p.notes || '—' }}</div>
+        </div>
+
+        <div class="box">
+          <div class="muted small">Añadir nota clínica</div>
+          <div class="gridMini" [class.disabled]="!canEditPatients()">
+            <input type="date" [(ngModel)]="noteDate" [disabled]="!canEditPatients()" />
+            <input [(ngModel)]="noteTitle" [disabled]="!canEditPatients()" placeholder="Título" />
+            <textarea [(ngModel)]="noteDetail" [disabled]="!canEditPatients()" placeholder="Detalle"></textarea>
+            <button class="btn primary" (click)="addNote(p.id)" [disabled]="!canEditPatients()">Guardar nota</button>
+          </div>
+        </div>
+
+        <div class="box span2">
+          <div class="muted small">Historial</div>
+          <div class="history" *ngIf="p.history?.length; else emptyH">
+            <div class="hItem" *ngFor="let n of p.history">
+              <div class="line1">
+                <b>{{ n.title }}</b>
+                <span class="muted small">{{ n.dateISO }}</span>
+              </div>
+              <div class="muted">{{ n.detail }}</div>
+            </div>
+          </div>
+          <ng-template #emptyH>
+            <div class="muted">Sin notas clínicas.</div>
+          </ng-template>
+        </div>
+
+        <div class="box">
+          <div class="muted small">Acciones</div>
+          <button class="btn danger" (click)="removePatient(p.id)" [disabled]="!canEditPatients()">Eliminar paciente</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- APPT MODAL -->
+  <div class="modal" *ngIf="apptModal() as a" (click)="closeAppt()">
+    <div class="modalCard" (click)="$event.stopPropagation()">
+      <div class="modalHead">
+        <div class="grow">
+          <h3>{{ patientName()(a.patientId) }}</h3>
+          <div class="muted small">{{ a.dateTime.replace('T',' ') }} · 🩺 {{ doctorName()(a.doctorId) }}</div>
+          <div class="muted small">Motivo: {{ a.reason || '—' }}</div>
+        </div>
+        <button class="btn ghost" (click)="closeAppt()">Cerrar</button>
+      </div>
+
+      <div class="modalGrid">
+        <div class="box">
+          <div class="muted small">Estado</div>
+          <span class="badge" [attr.data-s]="a.status">{{ a.status }}</span>
+        </div>
+
+        <div class="box">
+          <div class="muted small">Cambiar estado</div>
+          <select [ngModel]="a.status" (ngModelChange)="setStatus(a.id, $event)" [disabled]="!canEditAppointments()">
+            <option *ngFor="let s of statuses" [value]="s">{{ s }}</option>
+          </select>
+        </div>
+
+        <div class="box span2">
+          <div class="muted small">Acciones</div>
+          <button class="btn danger" (click)="removeAppt(a.id)" [disabled]="!canEditAppointments()">Eliminar cita</button>
+          <div class="muted tiny">En agenda puedes arrastrarla a otra hora.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
